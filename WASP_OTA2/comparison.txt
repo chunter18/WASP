@@ -1,0 +1,20 @@
+
+Starting WICED vWiced_006.000.001.0005
+Platform CYW943907AEVAL1F initialised
+Started ThreadX v5.6
+Initialising NetX_Duo v5.7_sp2
+Creating Packet pools
+WLAN MAC Address : A4:08:EA:D9:C5:E6
+WLAN Firmware    : wl0: Oct 23 2017 03:40:42 version 7.15.168.101 (r674438) FWID 01-13cae12
+WLAN CLM         : API: 12.2 Data: 9.10.74 Compiler: 1.31.3 ClmImport: 1.36.3 Creation: 2017-10-23 03:36:41
+Joining : WASP_2.4
+Successfully joined : WASP_2.4
+Obtaining IPv4 address via DHCP
+DHCP CLIENT hostname WICED IP
+IPv4 network ready IP: 192.168.1.116
+Setting IPv6 link-local address
+IPv6 network ready IP: FE80:0000:0000:0000:A608:EAFF:FED9:C5E6
+0000 00:00:07.873 PLAYER_EVENT_GET_UPDATE !
+0001 00:00:07.877 ota2_test_get_update() wiced_ota2_service_init() bg_service:0x0
+0002 00:00:07.884 PLAYER_EVENT_GET_UPDATE ota2_test_get_update() failed! 4
+0003 00:00:07.891 OTA2: wiced_ota2_service_deinit() Bad arg!
