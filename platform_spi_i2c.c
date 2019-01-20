@@ -1551,6 +1551,8 @@ static platform_result_t spi_transfer_nosetup( const platform_spi_t* spi, const 
         gsio_wait_for_xfer_to_complete( spi->port );
         data = gsio_regs[spi->port].interface->data;
 
+        gsio_regs[spi->port].interface->data = data
+
         if ( rcv_ptr != NULL )
         {
             *rcv_ptr++ = (uint8_t)data;
@@ -1721,7 +1723,7 @@ static uint8_t spi_bb_transfer_byte( const platform_spi_t* spi, const platform_s
         {
             case 0: /* CPOL = 0, CPHA = 0 */
                 /* output data on MOSI */
-                SPI_BB_SET_MOSI(spi, ((send_byte & data_bit) ? 1 : 0));
+                SPI_BB_SET_MOSI(spi, ((send_byte & data_bit) ? 0 : 1));
 
                 /* CLOCK setup time delay */
                 SPI_BB_DELAY(spi_bb_clock_toggle_delay_cycles);
@@ -1822,7 +1824,7 @@ static uint8_t spi_bb_transfer_byte( const platform_spi_t* spi, const platform_s
             data_bit <<= 1;
         }
     }
-
+   // SPI_BB_SET_MOSI(spi, 1);
     return rcv_byte;
 }
 
@@ -1872,6 +1874,8 @@ static platform_result_t spi_bb_transfer( const platform_spi_t* spi, const platf
     spi_bb_cs_activate( spi, config, WICED_FALSE );
 
     platform_spi_core_clock_toggle( WICED_FALSE );
+
+    //SPI_BB_SET_MOSI(spi, 1);
 
     return result;
 }
