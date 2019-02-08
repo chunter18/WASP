@@ -2,8 +2,8 @@
 #include "sntp.h"
 #include <inttypes.h>
 
-//what is a good sync time? ill choose 1 min
-#define TIME_SYNC_PERIOD    (60 * SECONDS)
+//what is a good sync time? ill choose 10 min?
+#define TIME_SYNC_PERIOD    (10 * 60 * SECONDS)
 
 /* Change the server IP address to match the TCP echo server address */
 #define SERVER_IP_ADDRESS MAKE_IPV4_ADDRESS(192,168,1,219)
@@ -33,6 +33,10 @@ void application_start(void)
 {
     wiced_iso8601_time_t     iso8601_time;
     uint64_t                 cpu_time;
+    uint64_t                 time_start;
+    uint64_t                 time_end;
+    uint64_t                 delta;
+    uint64_t                 time_avg;
 
     /* Initialize the WICED device */
     wiced_init();
@@ -42,10 +46,10 @@ void application_start(void)
 
     //sntp_start_auto_time_sync( TIME_SYNC_PERIOD ); //this is takin forever
     wiced_time_get_iso8601_time( &iso8601_time );
-    WPRINT_APP_INFO( ("Current time is: %s\n", (char*)&iso8601_time) );
-    WPRINT_APP_INFO( ("sizeof variable: %d\n", sizeof(iso8601_time))); //sizeof gets you the number of bytes
+    //WPRINT_APP_INFO( ("Current time is: %s\n", (char*)&iso8601_time) );
+    //WPRINT_APP_INFO( ("sizeof variable: %d\n", sizeof(iso8601_time))); //sizeof gets you the number of bytes
     cpu_time = wiced_get_nanosecond_clock_value();
-    WPRINT_APP_INFO(("cpu_time: %f\n", (double)cpu_time));
+    //WPRINT_APP_INFO(("cpu_time: %f\n", (double)cpu_time));
 
     /* Create UDP socket */
     if (wiced_udp_create_socket(&udp_socket, UDP_TARGET_PORT, WICED_STA_INTERFACE) != WICED_SUCCESS)
@@ -55,10 +59,16 @@ void application_start(void)
 
 
     //lets try sending some example data first.
+    //takes about 175usec or .175 msec to send udp which can be shaved easily
     for(int i = 0; i < 10; i++)
+        time_start = wiced_get_nanosecond_clock_value();
         tx_udp_packet();
-
-
+        time_end = wiced_get_nanosecond_clock_value();
+        delta = (time_end - time_start);
+        WPRINT_APP_INFO(("packet send took %f nanoseconds, %f useconds\n", (double)delta, (double)(delta/1000)));
+        time_avg += delta;
+    time_avg /= 10;
+    WPRINT_APP_INFO(("packet send took  avg %f nanoseconds, %f useconds\n", (double)time_avg, (double)(time_avg/1000)));
 
 
     return;
@@ -124,20 +134,6 @@ wiced_result_t tx_udp_packet()
         return WICED_ERROR;
     }
 
-/* memcpy example - void * memcpy ( void * destination, const void * source, size_t num );
-struct {
-    char name[40];
-    int age;
-} person, person_copy;
-char myname[] = "Pierre de Fermat";
-// using memcpy to copy string:
-memcpy ( person.name, myname, strlen(myname)+1 );
-person.age = 46;
-//using memcpy to copy structure:
-memcpy ( &person_copy, &person, sizeof(person) );
-printf ("person_copy: %s, %d \n", person_copy.name, person_copy.age );
-*/
-
     /* fiddling with the data */
     raw_data.packet_count = tx_count++;
     wiced_time_get_iso8601_time( &iso8601_time );
@@ -155,10 +151,18 @@ printf ("person_copy: %s, %d \n", person_copy.name, person_copy.age );
         raw_data.samples[i] = spi_bytes();
     }
 
-    memcpy(udp_data, &raw_data, sizeof(raw_data)); //pack it into the udp buffer
+    size_t ctsize = sizeof(raw_data.packet_count);
+    size_t isosize = sizeof(raw_data.time_start);
+    size_t nsize = sizeof(raw_data.nano_time_start);
+    size_t ssize = sizeof(raw_data.samples);
+    size_t total = ctsize+isosize+nsize+ssize;
+    memcpy(udp_data, &(raw_data.packet_count), ctsize);
+    memcpy(udp_data+ctsize, &(raw_data.time_start), isosize);
+    memcpy(udp_data+ctsize+isosize, &(raw_data.nano_time_start), nsize);
+    memcpy(udp_data+ctsize+isosize+nsize, (raw_data.samples), ssize);
 
     /* Set the end of the data portion */
-    wiced_packet_set_data_end( packet, (uint8_t*) udp_data + strlen(udp_data) ); //what is this max data length?
+    wiced_packet_set_data_end( packet, (uint8_t*) udp_data + total );
 
     /* Send the UDP packet */
     if ( wiced_udp_send( &udp_socket, &target_ip_addr, UDP_TARGET_PORT, packet ) != WICED_SUCCESS )
@@ -173,9 +177,9 @@ printf ("person_copy: %s, %d \n", person_copy.name, person_copy.age );
      *        will be automatically deleted *AFTER* it has been successfully sent
      */
 
-    WPRINT_APP_INFO( ("Current time is: %s\n", (char*)&iso8601_time) );
-    WPRINT_APP_INFO(("cpu_time: %f\n", (float)raw_data.nano_time_start));
-    WPRINT_APP_INFO( ("sent: %d\n", (int)tx_count) );
+    //WPRINT_APP_INFO( ("Current time is: %s\n", (char*)&iso8601_time) );
+    //WPRINT_APP_INFO(("cpu_time: %f\n", (float)raw_data.nano_time_start));
+    //WPRINT_APP_INFO( ("sent: %d\n", (int)tx_count) );
 
     return WICED_SUCCESS;
 }

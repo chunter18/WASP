@@ -11,6 +11,12 @@
 
 #include "platform.h"
 
+#define PLATFORM_HIB_ENABLE
+
+//adding spi bb slowdown
+#define SPI_BB_TRANSFER_DELAY_SUPPORT
+//clock rate is 320 MHz by default on cyw43907
+
 #define VREF 5
 //#define VREF 3.3 //WASP
 
@@ -97,7 +103,7 @@ wiced_spi_device_t spi_device =
 {
     .port               = WICED_SPI_1,
     .chip_select        = WICED_GPIO_22, //CS PIN IN 43097
-    .speed              = 1000000,     //1mhz still for bb
+    .speed              = 500000,  /*500khz*/   //1mhz base for bb, if #define is ther can change it here
     .mode               = ( SPI_CLOCK_RISING_EDGE | SPI_CLOCK_IDLE_LOW | SPI_MSB_FIRST ),
     .bits               = 8
 };
@@ -108,7 +114,7 @@ void delay(void);
 
 void application_start(void)
 {
-    int cc_gpio_bit = 31;
+
 
     /* Initialize the WICED device */
     //wiced_init();
@@ -129,7 +135,7 @@ void application_start(void)
     WPRINT_APP_INFO(( "1\n" ));
     int16_t nsegments = 2;
     wiced_spi_message_segment_t message[1];
-    uint8_t txbuf[3] , rxbuf[3];
+    uint8_t txbuf[2] , rxbuf[2];
 /*
     //toggle cnv for  a convert
     //wiced_gpio_output_high(WICED_GPIO_34);
@@ -186,13 +192,12 @@ void application_start(void)
     WPRINT_APP_INFO(( "6\n" ));
     txbuf[0] = 0xFF; //this is what we send for conversion
     txbuf[1] = 0xFF;
-    txbuf[2] = 0xFF;
     //rxbuf[0] = 0x00;
     //rxbuf[1] = 0x00;
 
     message[0].tx_buffer = txbuf;
     message[0].rx_buffer = rxbuf;
-    message[0].length = 3;
+    message[0].length = 2;
     WPRINT_APP_INFO(( "7\n" ));
 
     //wiced_gpio_output_high(WICED_GPIO_34);
@@ -208,6 +213,19 @@ void application_start(void)
     //platform_gpio_output_low(&platform_gpio_pinsX[WICED_GPIO_34]);
     //do we need to check if its a success? will it really ever not be?
     WPRINT_APP_INFO(( "8\n" ));
+    //PLATFORM_CHIPCOMMON->gpio.output |= (   1 << 31 );
+    //PLATFORM_CHIPCOMMON->gpio.output |= (   1 << 31 );
+    //PLATFORM_CHIPCOMMON->gpio.output &= (~( 1 << 31 ));
+
+    if (wiced_spi_transfer(&spi_device , message, nsegments)!=WICED_SUCCESS)
+    {
+        WPRINT_APP_INFO(("SPI slave send failed at master side\n"));
+    }
+    else
+    {
+        WPRINT_APP_INFO(("SPI slave send success\n"));
+    }
+
     if (wiced_spi_transfer(&spi_device , message, nsegments)!=WICED_SUCCESS)
     {
         WPRINT_APP_INFO(("SPI slave send failed at master side\n"));
@@ -219,7 +237,7 @@ void application_start(void)
 
     WPRINT_APP_INFO( ("\nReceived  0x%x", rxbuf[0]));
     WPRINT_APP_INFO( ("\nReceived  0x%x", rxbuf[1]));
-    WPRINT_APP_INFO( ("\nReceived  0x%x", rxbuf[2]));
+    //WPRINT_APP_INFO( ("\nReceived  0x%x", rxbuf[2]));
     WPRINT_APP_INFO( ("\n"));
 
     //voltage step size is vref/2^16 (16 bit adc)
@@ -236,6 +254,8 @@ void application_start(void)
     wiced_rtos_delay_microseconds(15);
     WPRINT_APP_INFO(("END OF SPI\n\n\n"));
     wiced_core_deinit( );
+    wiced_rtos_delay_milliseconds(100000);
+    platform_hibernation_start(320000);
 
 }
 

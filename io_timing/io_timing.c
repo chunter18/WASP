@@ -292,6 +292,7 @@ void application_start(void)
 }
 
 /*
+ * 43907
 GPIO #1 -> cc_gpio_bit = 0
 GPIO #2 -> cc_gpio_bit = 1
 GPIO #3 -> cc_gpio_bit = 7

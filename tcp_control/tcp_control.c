@@ -21,13 +21,20 @@ typedef struct
 
 typedef struct
 {
-        unsigned int fetch_update_command : 1;
-        unsigned int send_to_hibernate : 1;
-        unsigned int switch_network : 1;
-        unsigned int test_begin : 1;
-        unsigned int init_self_test_proc : 1;
-        unsigned int wireless : 27; //placeholder
+        uint8_t fetch_update_command;
+        uint8_t send_to_hibernate;
+        uint8_t switch_network;
+        uint8_t test_begin;
+        uint8_t init_self_test_proc;
+        uint8_t wireless; //placeholder
 }init_response_t; //response message to client device
+//switching from bitfields - not sure how to work with them
+
+typedef struct
+{
+    uint8_t diagnostic_codes[4];
+    uint8_t extras[4]; //not sure what we need yet
+}control_ack_t;
 
 static platform_dct_wifi_config_t wifi_config_dct_local;
 
@@ -42,11 +49,14 @@ void application_start(void)
     /* Initialise the device and WICED framework */
     wiced_init( );
 
+
     /* Bring up the network interface */
-    wiced_network_up(WICED_STA_INTERFACE, WICED_USE_EXTERNAL_DHCP_SERVER, NULL);
+    //wiced_network_up(WICED_STA_INTERFACE, WICED_USE_EXTERNAL_DHCP_SERVER, NULL);
+    wiced_network_up(WICED_ETHERNET_INTERFACE, WICED_USE_EXTERNAL_DHCP_SERVER, NULL); //work
 
     /* Create a TCP socket */
-    if ( wiced_tcp_create_socket( &tcp_client_socket, WICED_STA_INTERFACE ) != WICED_SUCCESS )
+    //if ( wiced_tcp_create_socket( &tcp_client_socket, WICED_STA_INTERFACE ) != WICED_SUCCESS )
+    if ( wiced_tcp_create_socket( &tcp_client_socket, WICED_ETHERNET_INTERFACE ) != WICED_SUCCESS ) //work
     {
         WPRINT_APP_INFO( ("TCP socket creation failed\n") );
     }
@@ -59,7 +69,9 @@ void application_start(void)
     memcpy(init.mac, hostmac.octet, sizeof(init.mac)); //works
     init.battery_level = 87;
     init.test_codes = 0;
-    tcp_client(init);
+    wiced_result_t res = tcp_client(init);
+    if(res == WICED_SUCCESS)
+        WPRINT_APP_INFO(("We returned\n"));
 }
 
 
@@ -141,6 +153,8 @@ wiced_result_t tcp_client(init_packet_t send_packet)
         return WICED_ERROR;
     }
 
+    WPRINT_APP_INFO(("got packet\n"));
+    init_response_t resp;
     /* Get the contents of the received packet */
     wiced_packet_get_data(rx_packet, 0, (uint8_t**)&rx_data, &rx_data_length, &available_data_length);
 
@@ -156,15 +170,59 @@ wiced_result_t tcp_client(init_packet_t send_packet)
         return WICED_ERROR;
     }
 
-    init_response_t resp;
-    memcpy(&resp, rx_data, sizeof(resp));
+    WPRINT_APP_INFO(("%c\n", rx_data[0]));
+    WPRINT_APP_INFO(("%c\n", rx_data[1]));
+    WPRINT_APP_INFO(("%c\n", rx_data[2]));
+    WPRINT_APP_INFO(("%c\n", rx_data[3]));
+    resp.fetch_update_command = rx_data[0];
+    resp.send_to_hibernate = rx_data[1];
+    resp.switch_network = rx_data[2];
+    resp.test_begin = rx_data[3];
+    resp.init_self_test_proc = rx_data[4];
+    resp.wireless = rx_data[5];
+
+    //if(resp.fetch_update_command == 122)
+    //{
+    //    WPRINT_APP_INFO(("wtf\n"));
+    //    WPRINT_APP_INFO(("get update = %d\n", resp.fetch_update_command));
+    //}
+
+    //Null terminate the received string
+    //rx_data[rx_data_length] = '\x0';
+    //WPRINT_APP_INFO(("Received data: %s \n", rx_data));
+
+
+/* so ive tried all thes memvpy things but none work
+    memcpy(&(resp.fetch_update_command), rx_data, fuc);
+    memcpy(&(resp.send_to_hibernate), rx_data+fuc, sth);
+    memcpy(&(resp.switch_network), rx_data+fuc+sth, sn);
+    memcpy(&(resp.test_begin), rx_data+fuc+sth+sn, tb);
+    memcpy(&(resp.init_self_test_proc), rx_data+fuc+sth+sn+tb, istp);
+    memcpy(&(resp.wireless), rx_data+fuc+sth+sn+tb+istp, w);
+*/
 
     WPRINT_APP_INFO(("Values Recieved"));
-    WPRINT_APP_INFO(("%s", rx_data));
+    WPRINT_APP_INFO(("get update = %d\n", resp.fetch_update_command));
+    WPRINT_APP_INFO(("send to hib = %d\n", resp.send_to_hibernate));
+    WPRINT_APP_INFO(("network change = %d\n", resp.switch_network));
+    WPRINT_APP_INFO(("test_begin = %d\n", resp.test_begin));
+    WPRINT_APP_INFO(("self test = %d\n", resp.init_self_test_proc));
+    WPRINT_APP_INFO(("wireless bits = %d\n", resp.wireless));
 
     /* Delete the packet and terminate the connection */
     wiced_packet_delete(rx_packet);
     wiced_tcp_disconnect(&tcp_client_socket);
+
+    if(resp.fetch_update_command == 1)
+        do_update();
+    if(resp.send_to_hibernate == 1)
+        ex2();
+    if(resp.switch_network == 1)
+        ex2();
+    if(resp.test_begin == 1)
+        ex2();
+    if(resp.init_self_test_proc == 1)
+        ex2();
 
     return WICED_SUCCESS;
 
